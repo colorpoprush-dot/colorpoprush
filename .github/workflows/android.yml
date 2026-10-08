@@ -1,0 +1,80 @@
+name: Build Android test APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: color-pop-rush-debug-key-v1
+
+      - run: npm install
+
+      - name: Generate Android project
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Install game icon
+        run: |
+          python3 -m pip install Pillow
+          python3 scripts/install-icon.py
+
+      - name: Add AdMob App ID
+        shell: python
+        run: |
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          namespace = 'http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android', namespace)
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          tree = ET.parse(path)
+          root = tree.getroot()
+          application = root.find('application')
+          if application is None:
+              raise RuntimeError('Android application element missing')
+          name_key = '{' + namespace + '}name'
+          value_key = '{' + namespace + '}value'
+          name = 'com.google.android.gms.ads.APPLICATION_ID'
+          meta = next((m for m in application.findall('meta-data') if m.get(name_key) == name), None)
+          if meta is None:
+              meta = ET.SubElement(application, 'meta-data')
+          meta.set(name_key, name)
+          meta.set(value_key, 'ca-app-pub-6051569226872743~2746233124')
+          tree.write(path, encoding='utf-8', xml_declaration=True)
+
+      - run: chmod +x android/gradlew
+
+      - run: ./gradlew assembleDebug
+        working-directory: android
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Color-Pop-Rush-Android-Test
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
