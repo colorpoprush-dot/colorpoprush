@@ -107,7 +107,7 @@ window.CPRAds=(()=>{
    ];
    for(const [event,fn]of bindings)listeners.push(await sdk.addListener(event,fn));
    ready=true;update(CPR_AD_CONFIG.testMode?'Test ads enabled.':'Ads ready.');preloadInterstitial();return true;
-  }catch(error){for(const listener of listeners)await listener.remove().catch(()=>{});listeners=[];update('Ads unavailable. Check internet and AdMob privacy-message setup.');console.warn('Ad service:',error?.message);return false}
+  }catch(error){for(const listener of listeners)await listener.remove().catch(()=>{});listeners=[];update('Ad setup error: ' + (error?.message || String(error)));console.warn('Ad service:',error?.message);return false}
   finally{initializing=null}})();return initializing;
  }
  async function preloadInterstitial(){
